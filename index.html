@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sky Maker</title>
+  <meta name="description" content="Make Firestorm sky, water and day cycle presets that look right under PBR lighting. Runs entirely in your browser.">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Pinned CDN versions so an upstream release can't break the site. Same as the Normal Map Maker. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+    }
+  }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/favicon.svg" alt="" width="24" height="24">
+      <h1>Sky Maker</h1>
+    </div>
+    <p class="tagline">WindLight skies, water and day cycles for Firestorm, tuned for PBR. Everything runs in your browser.</p>
+    <label class="btn" for="open-input">Open…</label>
+    <input type="file" id="open-input" accept=".xml,.json,application/xml,application/json" hidden>
+  </header>
+
+  <aside class="panel controls" aria-label="Settings">
+    <label class="ctl">
+      <span class="ctl-label">Project name</span>
+      <input type="text" id="project-name" maxlength="63" autocomplete="off" spellcheck="false">
+    </label>
+
+    <div class="tabs" role="tablist" aria-label="Editor">
+      <button role="tab" data-tab="sky" id="tabbtn-sky" aria-controls="tab-sky">Sky</button>
+      <button role="tab" data-tab="water" id="tabbtn-water" aria-controls="tab-water">Water</button>
+      <button role="tab" data-tab="day" id="tabbtn-day" aria-controls="tab-day">Day cycle</button>
+      <button role="tab" data-tab="photo" id="tabbtn-photo" aria-controls="tab-photo">From image</button>
+    </div>
+
+    <section role="tabpanel" id="tab-sky" aria-labelledby="tabbtn-sky">
+      <div class="sky-row">
+        <select id="sky-select" aria-label="Sky being edited"></select>
+        <button class="btn icon" id="add-sky" title="New sky" aria-label="New sky">+</button>
+        <button class="btn icon" id="duplicate-sky" title="Duplicate sky" aria-label="Duplicate sky">⧉</button>
+        <button class="btn icon" id="delete-sky" title="Delete sky" aria-label="Delete sky">−</button>
+      </div>
+      <label class="ctl">
+        <span class="ctl-label">Sky name</span>
+        <input type="text" id="sky-name" maxlength="63" autocomplete="off" spellcheck="false">
+      </label>
+      <div id="sky-groups" class="groups"></div>
+    </section>
+
+    <section role="tabpanel" id="tab-water" aria-labelledby="tabbtn-water" hidden>
+      <button class="btn wide" id="match-sky">Match sky: fog colour from the horizon</button>
+      <p class="hint">One water goes with the whole project. It’s saved as <code>water/Default.xml</code>, which the day cycle importer needs, and again under the project name.</p>
+      <div id="water-groups" class="groups"></div>
+    </section>
+
+    <section role="tabpanel" id="tab-day" aria-labelledby="tabbtn-day" hidden>
+      <button class="btn primary wide" id="generate-day">Generate from the current sky</button>
+      <p class="hint">Makes Night, Sunrise, Noon and Sunset versions and keys them at 00:00, 06:00, 12:00 and 18:00. Drag keys on the timeline under the preview, or scrub it to see the blend.</p>
+      <ol id="day-keys" class="day-keys"></ol>
+      <p id="day-empty" class="hint">No keyframes yet.</p>
+      <p id="day-warn" class="warn" hidden>More than 4 keyframes means setting Reflection Probe Ambiance by hand on each one after import.</p>
+      <button class="btn wide" id="add-key">Add the current sky at the scrub time</button>
+    </section>
+
+    <section role="tabpanel" id="tab-photo" aria-labelledby="tabbtn-photo" hidden>
+      <div class="dropzone" id="photo-drop" tabindex="0" role="button" aria-label="Choose a photo or HDRI">
+        <input type="file" id="photo-input" accept="image/*,.hdr,.exr" hidden>
+        <strong>Drop a photo or HDRI</strong>
+        <span>.exr, .hdr, JPEG, PNG or WebP. Equirectangular (2:1) images are read as HDRIs.</span>
+      </div>
+      <label class="ctl">
+        <span class="ctl-label">Read as</span>
+        <select id="photo-kind">
+          <option value="auto">Auto (2:1 = HDRI)</option>
+          <option value="hdri">HDRI (equirectangular)</option>
+          <option value="photo">Normal photo</option>
+        </select>
+      </label>
+      <canvas id="photo-thumb" hidden></canvas>
+      <p id="photo-status" class="hint">Each image makes a new sky, named after the file, with starting values to tune. For a normal photo, place the sun yourself on the Sky tab.</p>
+      <ul id="photo-notes" class="notes"></ul>
+      <button class="btn wide" id="photo-undo" hidden>Undo: remove this sky</button>
+    </section>
+
+    <button id="reset" class="btn ghost wide">New project</button>
+  </aside>
+
+  <main class="stage">
+    <div class="stage-toolbar">
+      <code id="file-name"></code>
+      <span class="spacer"></span>
+      <button class="btn" id="view-files">View files</button>
+      <button class="btn" id="save-json">Save project</button>
+      <button class="btn" id="download-sky">Sky (.xml)</button>
+      <button class="btn primary" id="download-all">Download all (.zip)</button>
+    </div>
+    <div id="viewport" class="viewport">
+      <div class="viewport-badges">
+        <span id="ambiance-badge" class="badge"></span>
+        <span id="exposure-badge" class="badge"></span>
+      </div>
+      <div class="viewport-tools">
+        <button class="btn small" id="face-sun">Face the sun</button>
+        <button class="btn small" id="look-up">Look up</button>
+        <label class="ctl toggle small"><input type="checkbox" id="animate" checked> Animate</label>
+      </div>
+      <p class="viewport-hint">Drag to look around · scroll to zoom · an approximation of Firestorm’s PBR renderer</p>
+    </div>
+    <div id="timeline" class="timeline" hidden>
+      <button class="btn small" id="play" aria-pressed="false">Play</button>
+      <div id="timeline-track" class="timeline-track" tabindex="0" role="slider" aria-label="Preview time of day" aria-valuemin="0" aria-valuemax="24">
+        <span class="tick" style="left:0%">00</span><span class="tick" style="left:25%">06</span>
+        <span class="tick" style="left:50%">12</span><span class="tick" style="left:75%">18</span>
+        <span id="timeline-head" class="head"></span>
+      </div>
+      <output id="timeline-time" class="timeline-time"></output>
+    </div>
+    <section class="note">
+      <strong>After import:</strong> Firestorm’s importer only reads the classic WindLight fields. Open each sky and set
+      <strong>Reflection Probe Ambiance</strong> to the value in README.txt. The preview shows the result with it set.
+    </section>
+  </main>
+
+  <dialog id="files" aria-label="Files in the export">
+    <form method="dialog" class="files-head">
+      <select id="files-select" aria-label="File"></select>
+      <button class="btn">Close</button>
+    </form>
+    <pre id="files-content" class="xml" tabindex="0"></pre>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

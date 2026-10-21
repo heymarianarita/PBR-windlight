@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+<llsd>
+<map>
+  <key>ambient</key><array><real>0.15</real><real>0.18</real><real>0.3</real><real>0.1</real></array>
+  <key>blue_density</key><array><real>0.05</real><real>0.08</real><real>0.2</real><real>0.1</real></array>
+  <key>blue_horizon</key><array><real>0.1</real><real>0.12</real><real>0.25</real><real>0.125</real></array>
+  <key>cloud_color</key><array><real>0.2</real><real>0.2</real><real>0.25</real><real>1</real></array>
+  <key>cloud_pos_density1</key><array><real>0.5</real><real>0.5</real><real>0.4</real><real>1</real></array>
+  <key>cloud_pos_density2</key><array><real>0.5</real><real>0.5</real><real>0.1</real><real>1</real></array>
+  <key>cloud_scale</key><array><real>0.4</real><real>0</real><real>0</real><real>1</real></array>
+  <key>cloud_scroll_rate</key><array><real>10.2</real><real>10.01</real></array>
+  <key>cloud_shadow</key><array><real>0.2</real><real>0</real><real>0</real><real>1</real></array>
+  <key>density_multiplier</key><array><real>0.00015</real><real>0</real><real>0</real><real>1</real></array>
+  <key>distance_multiplier</key><array><real>1</real><real>0</real><real>0</real><real>1</real></array>
+  <key>east_angle</key><real>0</real>
+  <key>enable_cloud_scroll</key><array><boolean>1</boolean><boolean>1</boolean></array>
+  <key>gamma</key><array><real>1</real><real>0</real><real>0</real><real>1</real></array>
+  <key>glow</key><array><real>5</real><real>0.001</real><real>-0.48</real><real>1</real></array>
+  <key>haze_density</key><array><real>0.5</real><real>0</real><real>0</real><real>1</real></array>
+  <key>haze_horizon</key><array><real>0.15</real><real>0</real><real>0</real><real>1</real></array>
+  <key>max_y</key><array><real>1605</real><real>0</real><real>0</real><real>1</real></array>
+  <key>star_brightness</key><real>1.6</real>
+  <key>sun_angle</key><real>4.18879</real>
+  <key>sunlight_color</key><array><real>0.3</real><real>0.35</real><real>0.6</real><real>0.2</real></array>
+</map>
+</llsd>

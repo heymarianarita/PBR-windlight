@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<llsd>
+<array>
+  <array><real>0</real><string>PBR Test Night</string></array>
+  <array><real>0.5</real><string>PBR Test Noon</string></array>
+</array>
+</llsd>
