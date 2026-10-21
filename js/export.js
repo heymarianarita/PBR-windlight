@@ -43,7 +43,7 @@ export function readme(project) {
   const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
   const keys = [...project.day].filter((k) => byId[k.sky]).sort((a, b) => a.time - b.time);
   const lines = [
-    `${project.name} — made with Sky Maker`,
+    `${project.name} · made with Sky Maker`,
     '',
     'IMPORT',
     '  Bulk: unzip, then World > Environment > Bulk Import and pick the files.',

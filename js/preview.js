@@ -1,7 +1,7 @@
 // three.js preview: the ported WindLight sky, a small island test scene and water.
 // Everything renders into a half-float target; a final pass applies exposure,
 // ACES tone mapping and scene gamma. It's an approximation of Firestorm's PBR
-// renderer — Phase 7 calibrates it against in-world screenshots.
+// renderer; Phase 7 calibrates it against in-world screenshots.
 
 import { ATMOS_UNIFORMS, ATMOS_FUNCS, skyUniforms, skyIrradiance, makeCloudNoise } from './atmosphere.js';
 import { WATER_PARAMS, toStored } from './params.js';

@@ -23,7 +23,8 @@ means two steps: the tool picks legacy values that look right under PBR, then yo
 
 ```
 index.html
-css/style.css
+css/style.css   app styles, built on MDS tokens
+css/mds/        MDS (Mariana's Design System) tokens: colours, type, spacing, effects
 js/
   params.js      every sky and water parameter, defined once
   legacy-xml.js  LLSD read/write and file names: the only module that knows the format
@@ -39,7 +40,7 @@ js/
 phase1/          hand-written import test files and checklist
 ```
 
-A project holds any number of skies, one water and a day cycle. Slider values use the units the
+A project is one look: a single fixed sky, or a day cycle where every key has its own sky, plus one water. Sky names come from the project name ("My Look", "My Look Sunset"). Slider values use the units the
 Firestorm editor shows, and `params.js` converts them to what the file stores.
 
 ### Preview: what's a guess

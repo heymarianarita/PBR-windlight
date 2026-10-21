@@ -18,16 +18,57 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 // ---------- Project ----------
+// A project is one look, the way Firestorm sees it: either a single sky, or a day cycle
+// where every key has its own sky. Sky names come from the project name ("My Look",
+// or "My Look Sunset" for a key labelled Sunset), so there is no sky list to manage.
+const DEFAULT_NAME = 'My Look';
+
 function freshProject() {
   const id = uid();
   return {
     version: PROJECT_VERSION,
-    name: 'My Look',
-    skies: [{ id, name: 'My Sky', values: defaults(SKY_PARAMS) }],
+    name: DEFAULT_NAME,
+    skies: [{ id, name: DEFAULT_NAME, label: '', values: defaults(SKY_PARAMS) }],
     active: id,
     water: defaults(WATER_PARAMS),
     day: [],
   };
+}
+
+// Enforce the model after any change or load:
+// no day cycle → exactly one sky; day cycle → one sky per key, and nothing else.
+function normalize(p) {
+  if (!p.day.length) {
+    const keep = p.skies.find((s) => s.id === p.active) ?? p.skies[0];
+    p.skies = [keep];
+    keep.label = '';
+  } else {
+    const used = new Set();
+    p.day.sort((a, b) => a.time - b.time);
+    for (const k of p.day) {
+      let sky = p.skies.find((s) => s.id === k.sky);
+      if (used.has(k.sky)) {
+        // Two keys shared a sky (older projects): give the second its own copy.
+        sky = { ...structuredClone(sky), id: uid() };
+        p.skies.push(sky);
+        k.sky = sky.id;
+      }
+      used.add(k.sky);
+      if (!sky.label) sky.label = formatTime(k.time).replace(':', '.');
+    }
+    p.skies = p.skies.filter((s) => used.has(s.id));
+  }
+  if (!p.skies.some((s) => s.id === p.active)) p.active = p.skies[0].id;
+  syncNames(p);
+  return p;
+}
+
+function syncNames(p) {
+  const taken = new Set();
+  for (const s of p.skies) {
+    s.name = uniqueName(cleanName(s.label ? `${p.name} ${s.label}` : p.name), taken);
+    taken.add(s.name);
+  }
 }
 
 function cleanValues(params, raw) {
@@ -48,16 +89,15 @@ function sanitize(raw) {
   if (typeof raw.name === 'string') p.name = cleanName(raw.name, 'My Look');
   if (raw.version === 1 || (raw.sky && !raw.skies)) {
     p.skies[0].values = cleanValues(SKY_PARAMS, raw.sky);
-    if (typeof raw.name === 'string') p.skies[0].name = cleanName(raw.name);
-    return p;
+    return normalize(p);
   }
   if (Array.isArray(raw.skies) && raw.skies.length) {
-    const seen = new Set();
-    p.skies = raw.skies.slice(0, 32).map((s) => {
-      let name = uniqueName(cleanName(s?.name), seen);
-      seen.add(name);
-      return { id: typeof s?.id === 'string' ? s.id : uid(), name, values: cleanValues(SKY_PARAMS, s?.values) };
-    });
+    p.skies = raw.skies.slice(0, 32).map((s) => ({
+      id: typeof s?.id === 'string' ? s.id : uid(),
+      label: typeof s?.label === 'string' ? cleanLabel(s.label) : '',
+      name: cleanName(s?.name),
+      values: cleanValues(SKY_PARAMS, s?.values),
+    }));
   }
   p.active = p.skies.some((s) => s.id === raw.active) ? raw.active : p.skies[0].id;
   p.water = cleanValues(WATER_PARAMS, raw.water);
@@ -66,8 +106,16 @@ function sanitize(raw) {
       .filter((k) => k && Number.isFinite(k.time) && p.skies.some((s) => s.id === k.sky))
       .map((k) => ({ id: typeof k.id === 'string' ? k.id : uid(), time: clamp(k.time, 0, 0.9999), sky: k.sky }));
   }
-  return p;
+  // Older projects named skies freely ("My Look Sunset"): keep the part after the project name as the label.
+  for (const s of p.skies) {
+    if (!s.label && p.day.some((k) => k.sky === s.id)) {
+      s.label = cleanLabel(s.name.startsWith(`${p.name} `) ? s.name.slice(p.name.length + 1) : s.name.split(' ').pop());
+    }
+  }
+  return normalize(p);
 }
+
+const cleanLabel = (s) => String(s).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().slice(0, 24);
 
 function uniqueName(name, taken) {
   if (!taken.has(name)) return name;
@@ -214,31 +262,54 @@ function buildGroups(root, params, groups, target, scope) {
   }
 }
 
-// ---------- Sky list ----------
-function renderSkyList() {
-  const sel = $('#sky-select');
-  sel.replaceChildren(...project.skies.map((s) => new Option(s.name, s.id, false, s.id === project.active)));
-  $('#sky-name').value = activeSky().name;
-  $('#delete-sky').disabled = project.skies.length < 2;
+// ---------- Which sky is being edited ----------
+// Only shown with a day cycle: one chip per key, in time order.
+function renderSkyPicker() {
+  const wrap = $('#sky-times');
+  wrap.hidden = !project.day.length;
+  const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
+  $('#sky-time-chips').replaceChildren(...project.day.map((k) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.setAttribute('aria-pressed', k.sky === project.active);
+    b.innerHTML = '<span class="mono"></span> <span></span>';
+    b.firstChild.textContent = formatTime(k.time);
+    b.lastChild.textContent = byId[k.sky].label;
+    b.addEventListener('click', () => editKey(k));
+    return b;
+  }));
 }
 
-function addSky(name, values) {
-  const n = uniqueName(cleanName(name), new Set(project.skies.map((s) => s.name)));
-  const sky = { id: uid(), name: n, values };
-  project.skies.push(sky);
-  project.active = sky.id;
-  return sky;
+// Night, Sunrise, Noon and Sunset versions of one sky, each a key with its own sky.
+function makeDayCycle(base) {
+  project.skies = [];
+  project.day = generateVariants(base).map((v) => {
+    const sky = { id: uid(), label: v.name, name: '', values: v.values };
+    project.skies.push(sky);
+    return { id: uid(), time: v.time, sky: sky.id };
+  });
+  project.active = project.skies[2].id; // Noon: closest to the sky it came from
+  ui.dayTime = 0.5;
+}
+
+// Edit a key's sky: select it, move the timeline's time marker there and show the Sky tab.
+function editKey(k) {
+  project.active = k.sky;
+  ui.dayTime = k.time;
+  if (ui.tab !== 'sky') setTab('sky');
+  changed({ controls: true, day: true });
 }
 
 // ---------- Day cycle ----------
 function renderDay() {
   const list = $('#day-keys');
-  const keys = [...project.day].sort((a, b) => a.time - b.time);
-  list.replaceChildren(...keys.map((k) => {
+  const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
+  list.replaceChildren(...project.day.map((k) => {
+    const sky = byId[k.sky];
     const row = document.createElement('li');
     row.className = 'day-key';
-    row.innerHTML = `<input type="text" class="time" maxlength="5" aria-label="Time"><select aria-label="Sky"></select><button class="btn ghost icon" aria-label="Remove keyframe">×</button>`;
-    const time = row.querySelector('.time');
+    row.innerHTML = `<input type="text" class="time" maxlength="5" aria-label="Time"><input type="text" class="label" maxlength="24" aria-label="Name of this key"><button class="btn ghost sm">Edit</button><button class="icon-btn close" aria-label="Remove key">×</button>`;
+    const [time, label] = row.querySelectorAll('input');
     time.value = formatTime(k.time);
     time.addEventListener('change', () => {
       const t = parseTime(time.value);
@@ -246,24 +317,36 @@ function renderDay() {
       k.time = t;
       changed({ day: true });
     });
-    const sel = row.querySelector('select');
-    sel.replaceChildren(...project.skies.map((s) => new Option(s.name, s.id, false, s.id === k.sky)));
-    sel.addEventListener('change', () => { k.sky = sel.value; changed({ day: true }); });
-    row.querySelector('button').addEventListener('click', () => {
+    label.value = sky.label;
+    label.addEventListener('change', () => {
+      sky.label = cleanLabel(label.value) || formatTime(k.time).replace(':', '.');
+      changed({ day: true, controls: true });
+    });
+    row.querySelector('.btn').addEventListener('click', () => editKey(k));
+    const remove = row.querySelector('.icon-btn');
+    remove.disabled = project.day.length < 2;
+    remove.title = remove.disabled ? 'A day cycle needs at least one key. Use “Remove the day cycle” instead.' : 'Remove key';
+    remove.addEventListener('click', () => {
       project.day = project.day.filter((x) => x !== k);
-      changed({ day: true });
+      changed({ day: true, controls: true });
     });
     return row;
   }));
-  $('#day-empty').hidden = keys.length > 0;
-  $('#day-warn').hidden = keys.length <= MAX_DAY_KEYS;
+  const has = project.day.length > 0;
+  $('#day-off').hidden = has; // tab reads "Day cycle · off" while the look is a single sky
+  $('#day-empty').hidden = has;
+  $('#day-warn').hidden = project.day.length <= MAX_DAY_KEYS;
+  $('#generate-day').textContent = has ? 'Regenerate from the sky being edited' : 'Make a day cycle from this sky';
+  $('#add-key').hidden = !has;
+  $('#timeline').hidden = ui.tab !== 'day' || !has;
+  $('#remove-day').hidden = !has;
   renderTimeline();
 }
 
 function renderTimeline() {
   const track = $('#timeline-track');
   track.querySelectorAll('.marker').forEach((m) => m.remove());
-  const names = Object.fromEntries(project.skies.map((s) => [s.id, s.name]));
+  const names = Object.fromEntries(project.skies.map((s) => [s.id, s.label]));
   for (const k of project.day) {
     const m = document.createElement('button');
     m.className = 'marker';
@@ -276,6 +359,7 @@ function renderTimeline() {
   }
   $('#timeline-head').style.left = `${ui.dayTime * 100}%`;
   $('#timeline-time').textContent = formatTime(ui.dayTime);
+  updateToolbar();
 }
 
 // Labels slide from left- to right-aligned across the day so the end ones stay on the track.
@@ -289,7 +373,7 @@ function timeFromPointer(e) {
   return clamp((e.clientX - r.left) / r.width, 0, 0.9999);
 }
 
-// Drag snaps to 5 minutes; the scrub head follows so the preview shows the key.
+// Drag snaps to 5 minutes; the time marker follows so the preview shows the key.
 function dragMarker(e, k, m) {
   e.preventDefault();
   e.stopPropagation();
@@ -340,8 +424,9 @@ function changed(opts = {}) {
       const o = pendingOpts;
       pending = false;
       pendingOpts = {};
-      if (o.skies) renderSkyList();
+      normalize(project);
       if (o.day || o.skies) renderDay();
+      if (o.day || o.skies || o.controls) renderSkyPicker();
       if (o.controls) refreshControls();
       updatePreview();
       updateToolbar();
@@ -353,12 +438,25 @@ function changed(opts = {}) {
 function refreshControls() {
   for (const show of controls.values()) show();
   $('#project-name').value = project.name;
-  renderSkyList();
+  renderSkyPicker();
 }
 
+// Window titles read like files (MDS): "My Look.skyproject", "Pink Sunrise · skies/…xml".
 function updateToolbar() {
   const sky = activeSky();
-  $('#file-name').textContent = ui.tab === 'water' ? `water/${legacyFileName(project.name)}` : `skies/${legacyFileName(sky.name)}`;
+  const keys = project.day.length;
+  $('#project-title').textContent = `${project.name}.skyproject`;
+  $('#project-meta').textContent = keys ? `day cycle · ${keys} ${keys === 1 ? 'key' : 'keys'}` : 'one sky';
+  if (ui.tab === 'water') {
+    $('#preview-title').textContent = 'Water';
+    $('#file-name').textContent = 'water/Default.xml';
+  } else if (ui.tab === 'day' && project.day.length) {
+    $('#preview-title').textContent = `Day cycle · ${formatTime(ui.dayTime)}`;
+    $('#file-name').textContent = `days/${legacyFileName(project.name)}`;
+  } else {
+    $('#preview-title').textContent = sky.name;
+    $('#file-name').textContent = `skies/${legacyFileName(sky.name)}`;
+  }
 }
 
 // ---------- Tabs ----------
@@ -370,7 +468,7 @@ function setTab(tab) {
     b.tabIndex = on ? 0 : -1;
   }
   for (const p of document.querySelectorAll('[role="tabpanel"]')) p.hidden = p.id !== `tab-${tab}`;
-  $('#timeline').hidden = tab !== 'day';
+  $('#timeline').hidden = tab !== 'day' || !project.day.length;
   if (tab !== 'day') setPlaying(false);
   changed();
 }
@@ -396,8 +494,9 @@ async function analyzeFile(file) {
     const pixels = await pixelsFromFile(file);
     const res = analyzeSky(pixels, { kind: $('#photo-kind').value });
     drawThumb(pixels);
-    // A new sky named after the image: the current sky's other settings, plus what the image gave.
-    const previous = project.active;
+    // The image sets the whole look: the sky (or, with a day cycle, every key regenerated
+    // from it) on top of the current settings. Undo puts the previous look back.
+    photoUndo = structuredClone({ name: project.name, skies: project.skies, day: project.day, active: project.active });
     let values = cleanValues(SKY_PARAMS, { ...structuredClone(activeSky().values), ...structuredClone(res.values), ...(res.sun ?? {}) });
     if (res.targets) {
       const { fitSkyColors } = await import('./fit.js');
@@ -407,13 +506,18 @@ async function analyzeFile(file) {
         ? 'Sky colours fitted so the rendered zenith and horizon match the image.'
         : 'Sky colours fitted as closely as the WindLight model allows; the image’s colours are partly out of its range.');
     }
-    const sky = addSky(prettyName(file.name), values);
-    photoUndo = { id: sky.id, previous };
+    if (project.name === DEFAULT_NAME) project.name = prettyName(file.name);
+    const hadDay = project.day.length > 0;
+    if (hadDay) makeDayCycle(values);
+    else activeSky().values = values;
     const notes = $('#photo-notes');
     notes.replaceChildren(...res.notes.map((n) => Object.assign(document.createElement('li'), { textContent: n })));
-    status.textContent = `${res.kind === 'hdri' ? 'HDRI' : 'Photo'}: made the sky “${sky.name}”. Tune it on the Sky tab.`;
-    $('#photo-undo').hidden = false;
-    changed({ controls: true, skies: true, day: true });
+    status.textContent = hadDay
+      ? `${res.kind === 'hdri' ? 'HDRI' : 'Photo'}: the day cycle was regenerated from this image. The preview behind shows it.`
+      : `${res.kind === 'hdri' ? 'HDRI' : 'Photo'}: the sky now comes from this image. The preview behind shows it.`;
+    $('#photo-actions').hidden = false;
+    setTab('sky');
+    changed({ controls: true, day: true });
   } catch (err) {
     status.textContent = `Couldn’t read ${file.name}: ${err.message}`;
   }
@@ -476,36 +580,57 @@ function decodeName(fileName) {
   try { return decodeURIComponent(base); } catch { return base; }
 }
 
-async function openFile(file) {
-  const text = await file.text();
+// Open a saved project, or legacy files: pick a day cycle together with its skies (and
+// water) to load a whole exported look, or a single sky to replace the one being edited.
+async function openFiles(files) {
   try {
-    if (/^\s*[{[]/.test(text)) {
-      project = sanitize(JSON.parse(text));
+    const json = files.find((f) => /\.json$/i.test(f.name));
+    if (json) {
+      project = sanitize(JSON.parse(await json.text()));
       toast('Project loaded');
-    } else {
-      const data = parseXml(text);
-      const name = decodeName(file.name);
-      if (Array.isArray(data)) {
-        // Legacy day cycle: [[time, sky name], …]; skies must already be in the project.
-        const byName = Object.fromEntries(project.skies.map((s) => [s.name, s.id]));
-        const missing = data.filter((k) => !byName[k[1]]).map((k) => k[1]);
-        project.day = data.filter((k) => byName[k[1]]).map((k) => ({ id: uid(), time: clamp(Number(k[0]) || 0, 0, 0.9999), sky: byName[k[1]] }));
-        toast(missing.length ? `Day cycle loaded. Open these skies first: ${missing.join(', ')}` : 'Day cycle loaded', missing.length > 0);
-      } else if (data && 'waterFogColor' in data) {
-        project.water = cleanValues(WATER_PARAMS, waterFromLegacy(data, project.water));
-        toast('Legacy water loaded');
-      } else if (data && ('sun_angle' in data || 'ambient' in data)) {
-        // Ambiance isn't in legacy files: keep the current one.
-        const values = cleanValues(SKY_PARAMS, skyFromLegacy(data, activeSky().values));
-        addSky(name, values);
-        toast(`Legacy sky “${activeSky().name}” added`);
-      } else {
-        throw new Error('not a sky, water or day cycle file');
-      }
+      return changed({ controls: true, day: true });
     }
-    changed({ controls: true, skies: true, day: true });
+    const skies = new Map();
+    let day = null;
+    let dayName = '';
+    let water = null;
+    for (const f of files) {
+      const data = parseXml(await f.text());
+      const name = decodeName(f.name);
+      if (Array.isArray(data)) { day = data; dayName = name; }
+      else if (data && 'waterFogColor' in data) water = data;
+      else if (data && ('sun_angle' in data || 'ambient' in data)) skies.set(name, data);
+      else throw new Error(`${f.name} isn’t a sky, water or day cycle file`);
+    }
+    if (water) project.water = cleanValues(WATER_PARAMS, waterFromLegacy(water, project.water));
+    // Ambiance isn't in legacy files: keep the current one.
+    const base = activeSky().values;
+    if (day) {
+      const missing = day.map((k) => String(k[1])).filter((n) => !skies.has(n));
+      if (missing.length) throw new Error(`pick the day cycle’s skies too: ${[...new Set(missing)].join(', ')}`);
+      project.name = cleanName(dayName, DEFAULT_NAME);
+      project.skies = [];
+      project.day = day.map((k) => {
+        const skyName = String(k[1]);
+        const label = skyName.startsWith(`${project.name} `) ? skyName.slice(project.name.length + 1) : skyName;
+        const sky = { id: uid(), label: cleanLabel(label), name: '', values: cleanValues(SKY_PARAMS, skyFromLegacy(skies.get(skyName), base)) };
+        project.skies.push(sky);
+        return { id: uid(), time: clamp(Number(k[0]) || 0, 0, 0.9999), sky: sky.id };
+      });
+      toast(`Day cycle “${project.name}” loaded with ${project.day.length} keys`);
+    } else if (skies.size) {
+      const [name, data] = skies.entries().next().value;
+      activeSky().values = cleanValues(SKY_PARAMS, skyFromLegacy(data, base));
+      if (!project.day.length && project.name === DEFAULT_NAME) project.name = cleanName(name, DEFAULT_NAME);
+      toast(skies.size > 1
+        ? `Loaded “${name}”. To load several skies, pick the day cycle file with them.`
+        : project.day.length ? `“${name}” loaded into the ${activeSky().label} key` : `Sky “${name}” loaded`, skies.size > 1);
+    } else if (water) {
+      toast('Legacy water loaded');
+    }
+    changed({ controls: true, day: true });
   } catch (err) {
-    toast(`Couldn’t open ${file.name}: ${err.message}`, true);
+    toast(`Couldn’t open that: ${err.message}`, true);
   }
 }
 
@@ -519,6 +644,7 @@ function showFiles() {
   const show = () => { $('#files-content').textContent = dec.decode(files[sel.value]); };
   sel.onchange = show;
   show();
+  $('#files-meta').textContent = `${names.length} files`;
   $('#files').showModal();
 }
 
@@ -568,46 +694,37 @@ for (const b of document.querySelectorAll('[role="tab"]')) {
   });
 }
 
-$('#project-name').addEventListener('input', (e) => { project.name = cleanName(e.target.value, 'My Look'); changed(); });
+$('#project-name').addEventListener('input', (e) => { project.name = cleanName(e.target.value, DEFAULT_NAME); changed(); });
 $('#project-name').addEventListener('change', (e) => { e.target.value = project.name; });
-$('#sky-select').addEventListener('change', (e) => { project.active = e.target.value; changed({ controls: true }); });
-$('#sky-name').addEventListener('change', (e) => {
-  const sky = activeSky();
-  const others = new Set(project.skies.filter((s) => s !== sky).map((s) => s.name));
-  sky.name = uniqueName(cleanName(e.target.value), others);
-  changed({ skies: true });
-});
-$('#add-sky').addEventListener('click', () => { addSky('New Sky', defaults(SKY_PARAMS)); changed({ controls: true, skies: true }); });
-$('#duplicate-sky').addEventListener('click', () => {
-  addSky(`${activeSky().name} copy`, structuredClone(activeSky().values));
-  changed({ controls: true, skies: true });
-});
-$('#delete-sky').addEventListener('click', () => {
-  const sky = activeSky();
-  if (project.skies.length < 2 || !confirm(`Delete “${sky.name}”? Day cycle keys that use it are removed too.`)) return;
-  project.skies = project.skies.filter((s) => s !== sky);
-  project.day = project.day.filter((k) => k.sky !== sky.id);
-  project.active = project.skies[0].id;
-  changed({ controls: true, skies: true, day: true });
-});
 
 $('#match-sky').addEventListener('click', matchSky);
 
 $('#generate-day').addEventListener('click', () => {
-  if (project.day.length && !confirm('Replace the current day cycle with Night, Sunrise, Noon and Sunset versions of this sky?')) return;
-  const base = activeSky();
-  const baseName = base.name;
-  project.day = generateVariants(base.values).map((v) => {
-    const sky = addSky(`${baseName} ${v.name}`, v.values);
-    return { id: uid(), time: v.time, sky: sky.id };
-  });
-  project.active = base.id;
-  changed({ controls: true, skies: true, day: true });
-  toast('Added 4 skies and keyed them at 00:00, 06:00, 12:00 and 18:00');
+  if (project.day.length && !confirm('Replace every key with Night, Sunrise, Noon and Sunset versions of the sky you’re editing?')) return;
+  makeDayCycle(activeSky().values);
+  changed({ controls: true, day: true });
+  toast('Day cycle made: keys at 00:00, 06:00, 12:00 and 18:00, each with its own sky');
 });
+$('#remove-day').addEventListener('click', () => {
+  if (!confirm(`Remove the day cycle and keep only the ${activeSky().label} sky?`)) return;
+  project.day = [];
+  changed({ controls: true, day: true });
+});
+// A new key starts from what the day looks like at the time picked on the timeline.
 $('#add-key').addEventListener('click', () => {
-  project.day.push({ id: uid(), time: Math.round(ui.dayTime * 288) / 288 % 1, sky: activeSky().id });
-  changed({ day: true });
+  const time = Math.round(ui.dayTime * 288) / 288 % 1;
+  // Two keys at the same time would fight: open the one that's there instead.
+  const near = project.day.find((k) => Math.abs(((k.time - time + 1.5) % 1) - 0.5) < 15 / 1440);
+  if (near) {
+    editKey(near);
+    return toast(`There’s already a key at ${formatTime(near.time)}. Pick another time on the timeline to add one there.`);
+  }
+  const values = structuredClone(skyAt(project.day, skyById(), time) ?? activeSky().values);
+  const sky = { id: uid(), label: formatTime(time).replace(':', '.'), name: '', values };
+  project.skies.push(sky);
+  project.day.push({ id: uid(), time, sky: sky.id });
+  project.active = sky.id;
+  changed({ controls: true, day: true });
 });
 $('#timeline-track').addEventListener('pointerdown', (e) => {
   const track = e.currentTarget;
@@ -638,6 +755,7 @@ dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('o
 dz.addEventListener('dragleave', () => dz.classList.remove('over'));
 dz.addEventListener('drop', (e) => {
   e.preventDefault();
+  e.stopPropagation();
   dz.classList.remove('over');
   const f = e.dataTransfer.files[0];
   if (f) analyzeFile(f);
@@ -645,14 +763,30 @@ dz.addEventListener('drop', (e) => {
 dz.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#photo-input').click(); } });
 dz.addEventListener('click', () => $('#photo-input').click());
 $('#photo-undo').addEventListener('click', () => {
-  if (!photoUndo || project.skies.length < 2) return;
-  project.skies = project.skies.filter((s) => s.id !== photoUndo.id);
-  project.day = project.day.filter((k) => k.sky !== photoUndo.id);
-  project.active = project.skies.some((s) => s.id === photoUndo.previous) ? photoUndo.previous : project.skies[0].id;
+  if (!photoUndo) return;
+  Object.assign(project, photoUndo);
   photoUndo = null;
-  $('#photo-undo').hidden = true;
-  $('#photo-status').textContent = 'Removed the sky made from the image.';
-  changed({ controls: true, skies: true, day: true });
+  $('#photo-actions').hidden = true;
+  $('#photo-status').textContent = 'Put back the look from before the image.';
+  changed({ controls: true, day: true });
+});
+
+// "Generate from an image" works on the whole look, so it's an action, not an editor tab.
+function openImageDialog() {
+  $('#photo-actions').hidden = !photoUndo;
+  $('#image-dialog').showModal();
+}
+$('#open-image').addEventListener('click', openImageDialog);
+$('#photo-done').addEventListener('click', () => $('#image-dialog').close());
+// Dropping an image anywhere on the page opens the dialog with it.
+const isImage = (f) => f && (/^image\//.test(f.type) || /\.(exr|hdr)$/i.test(f.name));
+document.addEventListener('dragover', (e) => { if ([...e.dataTransfer.items].some((i) => i.kind === 'file')) e.preventDefault(); });
+document.addEventListener('drop', (e) => {
+  const f = e.dataTransfer.files[0];
+  if (!isImage(f)) return;
+  e.preventDefault();
+  if (!$('#image-dialog').open) openImageDialog();
+  analyzeFile(f);
 });
 
 $('#download-sky').addEventListener('click', downloadSky);
@@ -661,16 +795,21 @@ $('#save-json').addEventListener('click', saveJson);
 $('#view-files').addEventListener('click', showFiles);
 $('#face-sun').addEventListener('click', () => ui.preview?.faceLight());
 $('#look-up').addEventListener('click', () => ui.preview?.lookUp());
+$('#zoom').addEventListener('click', (e) => {
+  const on = document.body.classList.toggle('zoomed');
+  e.currentTarget.setAttribute('aria-pressed', on);
+  e.currentTarget.title = on ? 'Restore' : 'Zoom';
+});
 $('#animate').addEventListener('change', (e) => ui.preview?.setAnimate(e.target.checked));
 $('#open-input').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) openFile(f);
+  const files = [...e.target.files];
+  if (files.length) openFiles(files);
   e.target.value = '';
 });
 $('#reset').addEventListener('click', () => {
   if (!confirm('Start a new project? Unsaved skies, water and day cycle are lost.')) return;
   project = freshProject();
-  changed({ controls: true, skies: true, day: true });
+  changed({ controls: true, day: true });
 });
 
 setTab('sky');

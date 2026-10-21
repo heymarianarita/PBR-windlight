@@ -1,0 +1,25 @@
+:root {
+  --radius-control: 6px;    /* window controls, small buttons */
+  --radius-inner: 9px;      /* button inside a field */
+  --radius-quote: 10px;
+  --radius-card: 12px;      /* project cards, inputs, inset panels, desktop icons */
+  --radius-dock-item: 13px;
+  --radius-window: 14px;
+  --radius-dialog: 18px;
+  --radius-dock: 20px;
+  --radius-pill: 99px;
+
+  --shadow-window: 0 28px 64px -28px rgba(0, 0, 0, 0.7);
+  --shadow-dock: 0 16px 40px -18px rgba(0, 0, 0, 0.7);
+  --shadow-dialog: 0 34px 80px -32px rgba(0, 0, 0, 0.95);
+  --shadow-tooltip: 0 8px 22px -10px rgba(0, 0, 0, 0.9);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 0.14s;
+  --dur-hover: 0.18s;
+  --dur-window: 0.42s;
+  --lift-hover: translateY(-2px);
+
+  --grain-opacity: 0.3;
+}

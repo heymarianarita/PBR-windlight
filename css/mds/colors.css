@@ -1,0 +1,91 @@
+:root {
+  /* Night: the desktop and every surface on it, darkest to lightest */
+  --mds-night-1000: #040129;  /* lock screen */
+  --mds-night-950: #050138;   /* desktop */
+  --mds-night-900: #080530;   /* menu bar */
+  --mds-night-880: #0A0736;   /* dock */
+  --mds-night-850: #0B0834;   /* window body, inputs */
+  --mds-night-800: #0E0A3D;   /* title bar, avatar well */
+  --mds-night-750: #100C42;   /* inset panel */
+  --mds-night-700: #131046;   /* desktop icon hover */
+  --mds-night-680: #141050;   /* tag fill */
+  --mds-night-650: #1B1650;   /* window control hover */
+  --mds-night-600: #221D53;   /* subtle divider */
+  --mds-night-550: #262159;   /* default border */
+  --mds-night-500: #2B2560;   /* strong border */
+  --mds-night-400: #3B3576;   /* window dot, idle field border */
+  --mds-night-300: #4A4870;   /* inline separator */
+
+  /* Grey: text on night, from the brief's greyscale */
+  --mds-grey-900: #2A292E;
+  --mds-grey-800: #44444B;
+  --mds-grey-700: #5F5E68;
+  --mds-grey-600: #7A7986;
+  --mds-grey-500: #9797A1;
+  --mds-grey-400: #B5B4BB;
+  --mds-grey-300: #D2D1D6;
+  --mds-grey-200: #F2F2F3;
+  --mds-grey-100: #FAFAFA;
+
+  /* Mint: the only accent */
+  --mds-mint-600: #26B582;
+  --mds-mint-500: #4EDAA7;
+  --mds-mint-300: #8DE7C7;
+  --mds-mint-200: #B7F0DC;
+
+  /* Cream: hairlines and glyph strokes on night */
+  --mds-cream-rgb: 246, 241, 228;
+
+  /* Feedback */
+  --mds-red-500: #E8524A;
+  --mds-red-300: #F59A93;
+  --mds-plum-700: #3B2154;    /* close-control hover */
+
+  /* ---------- semantic ---------- */
+  --bg-desktop: var(--mds-night-950);
+  --bg-lock: var(--mds-night-1000);
+  --surface-menubar: var(--mds-night-900);
+  --surface-dock: var(--mds-night-880);
+  --surface-window: var(--mds-night-850);
+  --surface-titlebar: var(--mds-night-800);
+  --surface-inset: var(--mds-night-750);
+  --surface-hover: var(--mds-night-700);
+  --surface-tag: var(--mds-night-680);
+  --surface-control-hover: var(--mds-night-650);
+  --surface-dialog: rgba(11, 8, 52, 0.92);
+  --surface-tooltip: rgba(4, 1, 42, 0.96);
+
+  --border-subtle: var(--mds-night-600);
+  --border-default: var(--mds-night-550);
+  --border-strong: var(--mds-night-500);
+  --border-field: var(--mds-night-400);
+  --border-menubar: rgba(var(--mds-cream-rgb), 0.1);
+  --border-tooltip: rgba(var(--mds-cream-rgb), 0.16);
+
+  --text-primary: var(--mds-grey-100);
+  --text-body: var(--mds-grey-200);
+  --text-secondary: var(--mds-grey-300);
+  --text-muted: var(--mds-grey-400);
+  --text-subtle: var(--mds-grey-500);
+  --text-faint: var(--mds-grey-600);
+  --text-separator: var(--mds-night-300);
+
+  --accent: var(--mds-mint-500);
+  --accent-hover: var(--mds-mint-300);
+  --accent-strong: var(--mds-mint-600);
+  --accent-soft: rgba(78, 218, 167, 0.14);
+  --accent-soft-hover: rgba(78, 218, 167, 0.24);
+  --accent-wash: rgba(78, 218, 167, 0.09);
+  --accent-line: rgba(78, 218, 167, 0.36);
+  --accent-selected: rgba(78, 218, 167, 0.2);
+  --accent-selected-line: rgba(78, 218, 167, 0.5);
+
+  --glyph-fill: rgba(var(--mds-cream-rgb), 0.1);
+  --glyph-stroke: rgba(var(--mds-cream-rgb), 0.42);
+  --chip-fill: rgba(var(--mds-cream-rgb), 0.05);
+  --chip-line: rgba(var(--mds-cream-rgb), 0.12);
+  --chip-ink: rgba(var(--mds-cream-rgb), 0.7);
+
+  --danger: var(--mds-red-500);
+  --danger-ink: var(--mds-red-300);
+}
