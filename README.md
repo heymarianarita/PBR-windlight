@@ -49,7 +49,7 @@ Phase 7 to calibrate:
 
 - `PROBE_SCALE` in `preview.js`: how much sky light one unit of Reflection Probe Ambiance adds
 - the auto-exposure target. Only its 0.5–2 range comes from the viewer
-- cloud UV mapping and scroll speed. The viewer uses a dome mesh and a noise texture; this uses a flat layer and generated noise
+- cloud UV mapping, noise and scroll speed. The viewer maps a tiling noise texture onto a dome mesh. This uses a flat layer and non-repeating noise computed in the shader, with the viewer's cloud formula on top
 - water waves and refraction. The fresnel mix follows `waterF.glsl`, but the seabed is analytic and objects don't reflect in the water
 
 ## Encodings (from the viewer source)

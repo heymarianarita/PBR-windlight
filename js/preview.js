@@ -165,10 +165,12 @@ uniform vec3 norm_scale;
 uniform float time;
 varying vec3 vWorld;
 
+// Wave slopes from the tiling noise texture (the clouds use shader noise instead).
+float waveNoise(vec2 uv) { return texture2D(cloud_noise, uv).x; }
 vec2 slope(vec2 uv) {
   float e = 1.0 / 512.0;
-  return vec2(cloudNoise(uv + vec2(e, 0.0)) - cloudNoise(uv - vec2(e, 0.0)),
-              cloudNoise(uv + vec2(0.0, e)) - cloudNoise(uv - vec2(0.0, e))) / (2.0 * e);
+  return vec2(waveNoise(uv + vec2(e, 0.0)) - waveNoise(uv - vec2(e, 0.0)),
+              waveNoise(uv + vec2(0.0, e)) - waveNoise(uv - vec2(0.0, e))) / (2.0 * e);
 }
 
 void main() {

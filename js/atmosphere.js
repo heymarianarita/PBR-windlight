@@ -145,13 +145,37 @@ vec3 skyColor(vec3 dir) {
   return clamp(color, vec3(0.0), vec3(5.0));
 }
 
-float cloudNoise(vec2 uv) { return texture2D(cloud_noise, uv).x; }
+// Cloud noise, computed here instead of read from the viewer's tiling noise texture:
+// fBm gradient noise that never repeats. Octaves smaller than a pixel fade out, as a
+// mipmapped texture would. Contrast is low (about 0.35–0.65) because cloudsF.glsl
+// multiplies (noise − 0.5) by 10.
+vec2 hash2(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return -1.0 + 2.0 * fract(sin(p) * 43758.5453);
+}
+float gnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  return mix(mix(dot(hash2(i), f), dot(hash2(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+             mix(dot(hash2(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)), dot(hash2(i + vec2(1.0)), f - vec2(1.0)), u.x), u.y);
+}
+float cloudNoise(vec2 uv) {
+  vec2 p = uv * 4.0;
+  float footprint = length(fwidth(p));
+  float v = 0.0, amp = 0.5, freq = 1.0;
+  for (int o = 0; o < 6; o++) {
+    v += amp * gnoise(p * freq + float(o) * 17.13) * (1.0 - smoothstep(0.3, 0.7, footprint * freq));
+    freq *= 2.03;
+    amp *= 0.5;
+  }
+  return 0.5 + v * 0.45;
+}
 
 // cloudsF.glsl: cloud colour and opacity in direction dir. The viewer maps the
 // noise onto its dome mesh; here it is projected onto a flat layer overhead.
 vec4 cloudLayer(vec3 dir) {
   if (cloud_scale < 0.001 || dir.y <= 0.0) return vec4(0.0);
-  vec2 tc = dir.xz / (dir.y + 0.12) * 0.09 + 0.5;
+  vec2 tc = dir.xz / (dir.y + 0.12) * 0.12 + 0.5;
   vec2 uv1 = (vec2(-tc.x, tc.y) - 0.5) / cloud_scale + 0.5 + cloud_offset;
   vec2 uv2 = uv1 + vec2(lightnorm.x, lightnorm.z) * 0.0125;
   // The detail layer repeats 16×; turning it keeps its tiles from lining up into a grid.
@@ -384,7 +408,8 @@ export function horizonColor(u) {
 }
 
 // Tileable fBm gradient noise, standing in for the viewer's soft cloud noise texture.
-// Gradient noise avoids the square, grid-aligned blobs that value noise gives.
+// Gradient noise avoids the square, grid-aligned blobs that value noise gives. The clouds
+// now compute their noise in the shader; the water still reads this texture for waves.
 export function makeCloudNoise(size = 512) {
   const rand = mulberry32(7);
   const octaves = [4, 8, 16, 32];
