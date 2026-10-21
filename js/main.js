@@ -648,6 +648,42 @@ function showFiles() {
   $('#files').showModal();
 }
 
+// ---------- How to import ----------
+// Steps for this project as it is now: one sky, or a day cycle with one ambiance per key.
+const escHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function showImportHelp() {
+  const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
+  const file = (dir, name) => `<span class="mono">${dir}/${escHtml(legacyFileName(name))}</span>`;
+  const amb = (sky) => sky.values.probeAmbiance.toFixed(2);
+  const apply = '<li>Click <strong>Save</strong>, then right-click it in your inventory and choose <strong>Apply Only to Myself</strong> (or apply it to your parcel or region).</li>';
+  let html = `<p>Unzip <span class="mono">${escHtml(project.name)}.zip</span> first, and keep its <span class="mono">skies</span>, <span class="mono">water</span> and <span class="mono">days</span> folders together.</p>`;
+  if (!project.day.length) {
+    const sky = project.skies[0];
+    html += `<h3>Sky</h3><ol>
+      <li>In your inventory, click <strong>+</strong>, then <strong>New Settings → New Sky</strong>.</li>
+      <li>Open it, click <strong>Import</strong> and pick ${file('skies', sky.name)}.</li>
+      <li>On the <strong>Atmosphere &amp; Lighting</strong> tab, set <strong>Reflection Probe Ambiance</strong> to <strong>${amb(sky)}</strong>. The file can’t carry this PBR setting, so it arrives as 0.</li>
+      ${apply}</ol>`;
+  } else {
+    const rows = project.day.map((k) => `<span class="mono">${formatTime(k.time)}</span><span>${escHtml(byId[k.sky].label)}</span><span class="num">${amb(byId[k.sky])}</span>`).join('');
+    html += `<h3>Day cycle</h3><ol>
+      <li>In your inventory, click <strong>+</strong>, then <strong>New Settings → New Day Cycle</strong>.</li>
+      <li>Open it, click <strong>Import</strong> and pick ${file('days', project.name)}. It loads its skies from <span class="mono">skies</span> and its water from <span class="mono">water/Default.xml</span>.</li>
+      <li>Click each sky key on the day cycle’s timeline and set <strong>Reflection Probe Ambiance</strong> on its <strong>Atmosphere &amp; Lighting</strong> tab. The files can’t carry it, so every key arrives at 0:
+        <div class="values">${rows}</div></li>
+      ${apply}</ol>
+      <p class="hint">Shortcut: <strong>World → Environment → Bulk Import</strong> creates every sky, the water and the day cycle at once. The ambiance still needs setting on each sky.</p>`;
+  }
+  html += `<h3>Water${project.day.length ? ' on its own (optional)' : ''}</h3><ol>
+    <li>Click <strong>+</strong>, then <strong>New Settings → New Water</strong>.</li>
+    <li>Open it, click <strong>Import</strong> and pick ${file('water', project.name)}.</li>
+    ${apply}</ol>`;
+  $('#import-steps').innerHTML = html;
+  $('#import-meta').textContent = project.day.length ? `day cycle · ${project.day.length} keys` : 'one sky';
+  $('#import-dialog').showModal();
+}
+
 // ---------- Toast ----------
 let toastTimer = 0;
 function toast(msg, isError = false) {
@@ -791,6 +827,8 @@ document.addEventListener('drop', (e) => {
 
 $('#download-sky').addEventListener('click', downloadSky);
 $('#download-all').addEventListener('click', downloadAll);
+$('#how-to-import').addEventListener('click', showImportHelp);
+$('#how-to-import-menu').addEventListener('click', showImportHelp);
 $('#save-json').addEventListener('click', saveJson);
 $('#view-files').addEventListener('click', showFiles);
 $('#face-sun').addEventListener('click', () => ui.preview?.faceLight());

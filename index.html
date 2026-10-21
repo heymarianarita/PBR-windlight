@@ -33,10 +33,12 @@
       <button class="menu-item" id="save-json">Save project</button>
       <button class="menu-item" id="view-files">View files</button>
       <button class="menu-item" id="reset">New project</button>
+      <button class="menu-item narrow-only" id="how-to-import-menu">How to import</button>
     </nav>
     <span class="spacer"></span>
     <span class="status">WindLight, tuned for PBR</span>
-    <button class="btn accent sm" id="download-all">Download all (.zip)</button>
+    <button class="btn ghost sm" id="how-to-import">How to import</button>
+    <button class="btn accent sm" id="download-all">Download<span class="wide-only"> all</span> (.zip)</button>
   </header>
 
   <main class="desktop">
@@ -151,6 +153,17 @@
         <button class="btn accent" id="photo-done">Edit the new sky</button>
       </div>
     </div>
+  </dialog>
+
+  <dialog id="import-dialog" class="dialog" aria-labelledby="import-title">
+    <div class="titlebar">
+      <span class="dot"></span>
+      <h2 class="title" id="import-title">How to import into Firestorm</h2>
+      <span class="meta" id="import-meta"></span>
+      <span class="spacer"></span>
+      <form method="dialog"><button class="icon-btn close" aria-label="Close">×</button></form>
+    </div>
+    <div class="dialog-body steps" id="import-steps" data-scroll></div>
   </dialog>
 
   <dialog id="files" class="dialog" aria-labelledby="files-title">
