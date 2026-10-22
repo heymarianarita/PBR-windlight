@@ -26,7 +26,7 @@ index.html
 css/style.css   app styles on MDS v3 tokens: a header and two panels, light and dark
 css/mds/        MDS v3 (Mariana's Design System) tokens: colours, type, spacing, effects, base
 js/
-  theme.js       System, Light or Dark theme button
+  theme.js       Light / Dark / System theme switch
   params.js      every sky and water parameter, defined once
   legacy-xml.js  LLSD read/write and file names: the only module that knows the format
   main.js        project state, generated controls, tabs, timeline, open/save

@@ -1,16 +1,19 @@
-// Theme: System (follows the OS), Light or Dark. The header button cycles them; an explicit choice is saved.
+// Theme: Light, Dark or System (follows the OS), picked in the header's three-option switch.
+// An explicit choice is saved; System clears it.
 const KEY = 'sky-maker:theme';
-const MODES = ['system', 'light', 'dark'];
 const root = document.documentElement;
-const button = document.getElementById('theme-toggle');
+const themeSwitch = document.getElementById('theme-switch');
+const themeButtons = [...themeSwitch.querySelectorAll('[role="radio"]')];
 
 const current = () => root.dataset.theme || 'system';
 
-function render(mode) {
-  const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
-  button.setAttribute('aria-label', `Theme: ${mode}. Switch to ${next}`);
-  button.title = `Theme: ${mode}`;
-  for (const icon of button.querySelectorAll('.theme-icon')) icon.hidden = icon.dataset.mode !== mode;
+// Only the current option is in the tab order (radio-group pattern).
+function renderThemeSwitch(mode) {
+  for (const b of themeButtons) {
+    const on = b.dataset.mode === mode;
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on ? 0 : -1;
+  }
 }
 
 function apply(mode) {
@@ -22,10 +25,27 @@ function apply(mode) {
     if (mode === 'system') localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, mode);
   } catch { /* storage unavailable */ }
-  render(mode);
+  renderThemeSwitch(mode);
   void root.offsetHeight;
   setTimeout(() => root.classList.remove('mds-theme-switching'), 0);
 }
 
-button.addEventListener('click', () => apply(MODES[(MODES.indexOf(current()) + 1) % MODES.length]));
-render(current());
+themeSwitch.addEventListener('click', (e) => {
+  const b = e.target.closest('[role="radio"]');
+  if (b) apply(b.dataset.mode);
+});
+
+// Radio-group keyboard: arrows move and select, Home/End jump.
+themeSwitch.addEventListener('keydown', (e) => {
+  const i = themeButtons.indexOf(document.activeElement);
+  if (i < 0) return;
+  const n = themeButtons.length;
+  const to = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: n - 1 }[e.key];
+  if (to === undefined) return;
+  e.preventDefault();
+  const b = themeButtons[(to + n) % n];
+  b.focus();
+  apply(b.dataset.mode);
+});
+
+renderThemeSwitch(current());
