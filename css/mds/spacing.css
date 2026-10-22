@@ -1,26 +1,22 @@
 :root {
-  --space-2: 2px;
-  --space-4: 4px;
-  --space-6: 6px;
-  --space-8: 8px;
-  --space-10: 10px;
-  --space-12: 12px;
-  --space-14: 14px;
-  --space-16: 16px;
-  --space-18: 18px;
-  --space-20: 20px;
-  --space-24: 24px;
-  --space-28: 28px;
-  --space-32: 32px;
-  --space-40: 40px;
-  --space-48: 48px;
+  /* 4px grid */
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
 
-  --measure-page: 840px;   /* résumé column */
-  --measure-text: 46ch;    /* lead line */
+  --container: 1024px;     /* page width */
+  --measure: 65ch;         /* running text */
+  --header-height: 56px;
 
-  --menubar-height: 38px;
-  --titlebar-height: 38px;
-  --control-size: 26px;
-  --dock-item: 48px;
-  --field-height: 46px;
+  --control-sm: 32px;
+  --control: 36px;
+  --control-lg: 40px;
 }

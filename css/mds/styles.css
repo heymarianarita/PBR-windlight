@@ -1,6 +1,7 @@
-@import "./fonts.css";
-@import "./colors.css";
-@import "./typography.css";
-@import "./spacing.css";
-@import "./effects.css";
-@import "./base.css";
+/* MDS v3 (Mariana's Design System). Copied from the system's tokens/ folder: update by copying it again. */
+/* Fonts load from a <link> in the page head (faster than a nested @import); fonts.css lists them. */
+@import "colors.css";
+@import "typography.css";
+@import "spacing.css";
+@import "effects.css";
+@import "base.css";

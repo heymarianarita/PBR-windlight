@@ -23,9 +23,10 @@ means two steps: the tool picks legacy values that look right under PBR, then yo
 
 ```
 index.html
-css/style.css   app styles, built on MDS tokens
-css/mds/        MDS (Mariana's Design System) tokens: colours, type, spacing, effects
+css/style.css   app styles on MDS v3 tokens: a header and two panels, light and dark
+css/mds/        MDS v3 (Mariana's Design System) tokens: colours, type, spacing, effects, base
 js/
+  theme.js       System, Light or Dark theme button
   params.js      every sky and water parameter, defined once
   legacy-xml.js  LLSD read/write and file names: the only module that knows the format
   main.js        project state, generated controls, tabs, timeline, open/save

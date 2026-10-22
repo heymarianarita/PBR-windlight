@@ -441,11 +441,11 @@ function refreshControls() {
   renderSkyPicker();
 }
 
-// Window titles read like files (MDS): "My Look.skyproject", "Pink Sunrise · skies/…xml".
+// Panel titles: the project name on the editor, the sky, water or time on the preview.
 function updateToolbar() {
   const sky = activeSky();
   const keys = project.day.length;
-  $('#project-title').textContent = `${project.name}.skyproject`;
+  $('#project-title').textContent = project.name;
   $('#project-meta').textContent = keys ? `day cycle · ${keys} ${keys === 1 ? 'key' : 'keys'}` : 'one sky';
   if (ui.tab === 'water') {
     $('#preview-title').textContent = 'Water';
