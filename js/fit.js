@@ -27,6 +27,9 @@ function render(values) {
   return { zenith, horizon: horizon.map((c) => c / n) };
 }
 
+// Zenith and horizon (away from the sun) as the sky model renders them, in linear RGB.
+export const renderSkyColors = render;
+
 // Error between rendered and target colours, in log space so dark and bright channels
 // count equally. Brightness is normalised: only colour and the zenith/horizon ratio matter.
 // keepAmbient: ambient also lights the scene, so its brightness is held near the

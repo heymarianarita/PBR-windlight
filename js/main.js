@@ -6,6 +6,7 @@ import { SKY_PARAMS, SKY_GROUPS, WATER_PARAMS, WATER_GROUPS, defaults } from './
 import { skyXml, skyFromLegacy, waterFromLegacy, parseXml, legacyFileName, cleanName } from './legacy-xml.js';
 import { downloadBlob, downloadZip, bundleFiles } from './export.js';
 import { skyAt, generateVariants, formatTime, parseTime } from './daycycle.js';
+import { SKY_SIMPLE, WATER_SIMPLE } from './simple.js';
 import { skyUniforms, horizonColor } from './atmosphere.js';
 
 const STORAGE_KEY = 'sky-maker:project:v2';
@@ -159,6 +160,14 @@ function fromSlider(p, s) {
 }
 
 // `target()` returns the values object the control edits (the active sky, or the water).
+// A control reads and writes `values[p.id]`, or goes through p.get / p.set when it stands
+// for several settings at once (the simple controls in simple.js).
+const readValue = (p, values) => (p.get ? p.get(values) : values[p.id]);
+function writeValue(p, values, v) {
+  if (p.set) p.set(values, v);
+  else values[p.id] = v;
+}
+
 function buildRange(p, target, key) {
   const el = document.createElement('div');
   el.className = 'ctl';
@@ -173,22 +182,24 @@ function buildRange(p, target, key) {
   if (p.log) Object.assign(range, { min: 0, max: SLIDER_STEPS, step: 1 });
   else Object.assign(range, { min: p.min, max: p.max, step: p.step });
 
+  // The control being dragged or typed in keeps its own value; everything else follows.
   const show = () => {
-    const v = target()[p.id];
-    range.value = toSlider(p, v);
+    const v = readValue(p, target());
+    if (document.activeElement !== range) range.value = toSlider(p, v);
     if (document.activeElement !== num) num.value = v.toFixed(decimals(p.step));
   };
   range.addEventListener('input', () => {
-    target()[p.id] = fromSlider(p, parseFloat(range.value));
-    num.value = target()[p.id].toFixed(decimals(p.step));
-    changed();
+    const v = fromSlider(p, parseFloat(range.value));
+    writeValue(p, target(), v);
+    num.value = v.toFixed(decimals(p.step));
+    changed({ controls: true });
   });
   num.addEventListener('input', () => {
     const v = parseFloat(num.value);
     if (!Number.isFinite(v)) return;
-    target()[p.id] = clamp(v, p.min, p.max);
-    range.value = toSlider(p, target()[p.id]);
-    changed();
+    writeValue(p, target(), clamp(v, p.min, p.max));
+    range.value = toSlider(p, clamp(v, p.min, p.max));
+    changed({ controls: true });
   });
   num.addEventListener('change', show);
   controls.set(key, show);
@@ -197,6 +208,7 @@ function buildRange(p, target, key) {
 }
 
 // A colour is three 0–1 sliders plus a swatch, matching the editor's colour picker.
+// Simple controls (with p.get) show the swatch alone.
 function buildColor(p, target, key) {
   const el = document.createElement('div');
   el.className = 'ctl color';
@@ -205,7 +217,7 @@ function buildColor(p, target, key) {
   const swatch = el.querySelector('.swatch');
   const out = el.querySelector('output');
   swatch.setAttribute('aria-label', `${p.label} colour picker`);
-  const rows = ['R', 'G', 'B'].map((ch, i) => {
+  const rows = p.get ? [] : ['R', 'G', 'B'].map((ch, i) => {
     const row = document.createElement('label');
     row.className = 'channel';
     row.innerHTML = `<span>${ch}</span><input type="range" min="0" max="1" step="0.001"><output></output>`;
@@ -214,23 +226,22 @@ function buildColor(p, target, key) {
     input.addEventListener('input', () => {
       target()[p.id][i] = parseFloat(input.value);
       show();
-      changed();
+      changed({ controls: true });
     });
     el.append(row);
     return { input, out: row.querySelector('output') };
   });
   swatch.addEventListener('input', () => {
     const hex = swatch.value;
-    target()[p.id] = [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16) / 255);
-    show();
-    changed();
+    writeValue(p, target(), [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16) / 255));
+    changed({ controls: true });
   });
 
   function show() {
-    const v = target()[p.id];
+    const v = readValue(p, target());
     const bytes = v.map((x) => Math.round(clamp(x, 0, 1) * 255));
     rows.forEach((r, i) => { r.input.value = v[i]; r.out.textContent = v[i].toFixed(3); });
-    swatch.value = '#' + bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+    if (document.activeElement !== swatch) swatch.value = '#' + bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
     out.textContent = bytes.join(', ');
   }
   controls.set(key, show);
@@ -243,6 +254,20 @@ function appendHint(el, text) {
   h.className = 'hint';
   h.textContent = text;
   el.append(h);
+}
+
+// The few simple controls, then every Firestorm setting folded under "Advanced",
+// the same layout as the PBR texture generator.
+function buildPanel(root, simple, params, groups, target, scope) {
+  const main = document.createElement('div');
+  main.className = 'controls';
+  main.append(...simple.map((p) => (p.type === 'color' ? buildColor(p, target, `${scope}-simple:${p.id}`) : buildRange(p, target, `${scope}-simple:${p.id}`))));
+  const adv = document.createElement('details');
+  adv.className = 'advanced';
+  adv.innerHTML = '<summary>Advanced</summary><div class="controls"><p class="hint"></p><div class="groups"></div></div>';
+  adv.querySelector('.hint').textContent = 'Every Firestorm setting, named as in its editor. The controls above change these for you.';
+  buildGroups(adv.querySelector('.groups'), params, groups, target, scope);
+  root.replaceChildren(main, adv);
 }
 
 function buildGroups(root, params, groups, target, scope) {
@@ -713,8 +738,16 @@ function tick(now) {
 }
 
 // ---------- Wiring ----------
-buildGroups($('#sky-groups'), SKY_PARAMS, SKY_GROUPS, () => activeSky().values, 'sky');
-buildGroups($('#water-groups'), WATER_PARAMS, WATER_GROUPS, () => project.water, 'water');
+buildPanel($('#sky-groups'), SKY_SIMPLE, SKY_PARAMS, SKY_GROUPS, () => activeSky().values, 'sky');
+buildPanel($('#water-groups'), WATER_SIMPLE, WATER_PARAMS, WATER_GROUPS, () => project.water, 'water');
+// "Match sky" sits under the water colour it sets.
+{
+  const match = document.createElement('button');
+  match.className = 'btn secondary sm';
+  match.id = 'match-sky';
+  match.textContent = 'Match the sky’s horizon';
+  $('#water-groups .controls > .ctl').append(match);
+}
 refreshControls();
 renderDay();
 updateToolbar();

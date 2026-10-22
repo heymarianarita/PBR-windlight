@@ -28,6 +28,7 @@ css/mds/        MDS v3 (Mariana's Design System) tokens: colours, type, spacing,
 js/
   theme.js       Light / Dark / System theme switch
   params.js      every sky and water parameter, defined once
+  simple.js      the few controls shown by default; each sets real Firestorm settings (rest under Advanced)
   legacy-xml.js  LLSD read/write and file names: the only module that knows the format
   main.js        project state, generated controls, tabs, timeline, open/save
   atmosphere.js  LGPL port of the viewer's sky, cloud and lighting shaders (kept separate)
