@@ -1,4 +1,4 @@
-# Sky Maker (PBR WindLight)
+# Windlight generator
 
 Make Firestorm **sky, water and day cycle** presets that look right under PBR lighting. It sits next to the
 Normal Map Maker and uses the same stack: plain HTML, CSS and ES modules, no build step.
@@ -23,7 +23,7 @@ means two steps: the tool picks legacy values that look right under PBR, then yo
 
 ```
 index.html
-css/style.css   app styles on MDS v3: the PBR Texture Generator's layout and components, plus Sky Maker's own
+css/style.css   app styles on MDS v3: the PBR Texture Generator's layout and components, plus Windlight generator's own
 css/mds/        MDS v3 (Mariana's Design System) tokens: colours, type, spacing, effects, base
 js/
   theme.js       Light / Dark / System theme switch

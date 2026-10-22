@@ -1,5 +1,5 @@
-/* Sky Maker on MDS v3 (Mariana's Design System). The base below is the PBR Texture
-   Generator's stylesheet, so the two tools look and behave alike; Sky Maker's own pieces
+/* Windlight generator on MDS v3 (Mariana's Design System). The base below is the PBR Texture
+   Generator's stylesheet, so the two tools look and behave alike; Windlight generator's own pieces
    (colour swatches, Advanced groups, day cycle, timeline, dialogs) follow at the end.
    Light by default, dark from the OS or data-theme="dark"; violet only for the main action,
    selection and focus. */
@@ -365,7 +365,7 @@ input[type="range"]:focus-visible { border-radius: var(--radius-sm); }
   .viewport { height: 62vh; height: 62svh; min-height: 300px; }
 }
 
-/* ================= Sky Maker ================= */
+/* ================= Windlight generator ================= */
 
 code, output, .mono { font-family: var(--font-mono); }
 [hidden] { display: none !important; } /* component display rules (.btn is inline-flex) would otherwise beat it */
