@@ -272,8 +272,8 @@ function buildPanel(root, simple, params, groups, target, scope) {
   main.append(...simple.map((p) => (p.type === 'color' ? buildColor(p, target, `${scope}-simple:${p.id}`) : buildRange(p, target, `${scope}-simple:${p.id}`))));
   const adv = document.createElement('details');
   adv.className = 'advanced';
-  adv.innerHTML = '<summary>Advanced</summary><div class="controls"><p class="hint"></p><div class="groups"></div></div>';
-  adv.querySelector('.hint').textContent = 'Every Firestorm setting, named as in its editor. The controls above change these for you.';
+  adv.innerHTML = '<summary>Advanced</summary><div class="controls"><p class="about small"></p><div class="groups"></div></div>';
+  adv.querySelector('.about').textContent = 'Every Firestorm setting, named as in its editor. The controls above change these for you.';
   buildGroups(adv.querySelector('.groups'), params, groups, target, scope);
   root.replaceChildren(main, adv);
 }
@@ -669,28 +669,25 @@ function showImportHelp() {
   const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
   const file = (dir, name) => `<span class="mono">${dir}/${escHtml(legacyFileName(name))}</span>`;
   const amb = (sky) => sky.values.probeAmbiance.toFixed(2);
-  const apply = '<li>Click <strong>Save</strong>, then right-click it in your inventory and choose <strong>Apply Only to Myself</strong> (or apply it to your parcel or region).</li>';
-  let html = `<p>Unzip <span class="mono">${escHtml(project.name)}.zip</span> first, and keep its <span class="mono">skies</span>, <span class="mono">water</span> and <span class="mono">days</span> folders together.</p>`;
+  const bulk = (type) => `In Firestorm, open <strong>World → Environment → Bulk Import</strong> and choose <strong>${type}</strong>`;
+  const apply = '<li>Right-click it and choose <strong>Apply Only to Myself</strong> (or apply it to your parcel or region).</li>';
+  let html = `<p>Unzip <span class="mono">${escHtml(project.name)}.zip</span> first.</p>`;
   if (!project.day.length) {
     const sky = project.skies[0];
     html += `<h3>Sky</h3><ol>
-      <li>In your inventory, click <strong>+</strong>, then <strong>New Settings → New Sky</strong>.</li>
-      <li>Open it, click <strong>Import</strong> and pick ${file('skies', sky.name)}.</li>
-      <li>On the <strong>Atmosphere &amp; Lighting</strong> tab, set <strong>Reflection Probe Ambiance</strong> to <strong>${amb(sky)}</strong>. The file can’t carry this PBR setting, so it arrives as 0.</li>
+      <li>${bulk('Skies')}, then pick ${file('skies', sky.name)}.</li>
+      <li>Open it from the <strong>Settings</strong> folder in your inventory. On the <strong>Atmosphere &amp; Lighting</strong> tab, set <strong>Reflection Probe Ambiance</strong> to <strong>${amb(sky)}</strong> and click <strong>Save</strong>. The file can’t carry this PBR setting, so it arrives as 0.</li>
       ${apply}</ol>`;
   } else {
     const rows = project.day.map((k) => `<span class="mono">${formatTime(k.time)}</span><span>${escHtml(byId[k.sky].label)}</span><span class="num">${amb(byId[k.sky])}</span>`).join('');
     html += `<h3>Day cycle</h3><ol>
-      <li>In your inventory, click <strong>+</strong>, then <strong>New Settings → New Day Cycle</strong>.</li>
-      <li>Open it, click <strong>Import</strong> and pick ${file('days', project.name)}. It loads its skies from <span class="mono">skies</span> and its water from <span class="mono">water/Default.xml</span>.</li>
-      <li>Click each sky key on the day cycle’s timeline and set <strong>Reflection Probe Ambiance</strong> on its <strong>Atmosphere &amp; Lighting</strong> tab. The files can’t carry it, so every key arrives at 0:
+      <li>${bulk('Days')}, then pick ${file('days', project.name)}. Keep the unzipped folders together: it reads its skies from <span class="mono">skies</span> and its water from <span class="mono">water/Default.xml</span>.</li>
+      <li>Open it from the <strong>Settings</strong> folder in your inventory. Click each sky key on its timeline, set <strong>Reflection Probe Ambiance</strong> on the <strong>Atmosphere &amp; Lighting</strong> tab, then click <strong>Save</strong>. The files can’t carry this PBR setting, so every key arrives at 0:
         <div class="values">${rows}</div></li>
-      ${apply}</ol>
-      <p class="hint">Shortcut: <strong>World → Environment → Bulk Import</strong> creates every sky, the water and the day cycle at once. The ambiance still needs setting on each sky.</p>`;
+      ${apply}</ol>`;
   }
-  html += `<h3>Water${project.day.length ? ' on its own (optional)' : ''}</h3><ol>
-    <li>Click <strong>+</strong>, then <strong>New Settings → New Water</strong>.</li>
-    <li>Open it, click <strong>Import</strong> and pick ${file('water', project.name)}.</li>
+  html += `<h3>Water${project.day.length ? ' on its own (optional)' : ' (optional)'}</h3><ol>
+    <li>${bulk('Water')}, then pick ${file('water', project.name)}.</li>
     ${apply}</ol>`;
   $('#import-steps').innerHTML = html;
   $('#import-dialog').showModal();
