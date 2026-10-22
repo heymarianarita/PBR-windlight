@@ -51,6 +51,10 @@ button, input, select { font: inherit; color: inherit; }
 }
 .top h1 { margin: 0; font: var(--type-h2); letter-spacing: var(--tracking-tight); }
 .top { align-items: center; }
+/* The title sits inside the main grid, above the preview: the grid gives it its width. */
+.app > .top { max-width: none; margin: 0; padding: var(--space-8) 0 0; }
+.app { padding-top: 0; }
+.app > .top h1 { font: var(--type-h3); letter-spacing: var(--tracking-tight); white-space: nowrap; }
 .top-actions { display: flex; align-items: center; gap: var(--space-1); }
 .top-actions .theme-switch { margin-left: var(--space-2); }
 
@@ -362,16 +366,18 @@ input[type="range"]:focus-visible { border-radius: var(--radius-sm); }
 @media (min-width: 961px) {
   html, body { height: 100%; }
   body { display: flex; flex-direction: column; overflow: hidden; }
-  .top { flex: none; width: 100%; }
-  .app { flex: 1; min-height: 0; width: 100%; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: var(--space-6); }
+  .app { flex: 1; min-height: 0; width: 100%; grid-template-rows: auto minmax(0, 1fr); align-items: stretch; padding-bottom: var(--space-6); }
+  /* Title over the preview only; the settings column runs from the top of the window down. */
+  .app > .top { grid-column: 1; grid-row: 1; }
+  .viewer { grid-column: 1; grid-row: 2; }
   .viewer { position: static; min-height: 0; }
   .viewport { flex: 1; height: auto; min-height: 240px; }
-  .panel { min-height: 0; overflow-y: auto; align-content: start; padding: 2px 6px 2px 2px; margin: -2px -6px -2px -2px; } /* room for focus rings and the scrollbar */
+  .panel { grid-column: 2; grid-row: 1 / span 2; min-height: 0; overflow-y: auto; align-content: start; padding: var(--space-8) 6px 2px 2px; margin: 0 -6px -2px -2px; } /* room for focus rings and the scrollbar */
 }
 
 @media (max-width: 960px) {
-  .top { padding: var(--space-5) var(--space-4) var(--space-4); }
-  .top h1 { font: var(--type-h3); letter-spacing: var(--tracking-tight); }
+  .app > .top { padding: var(--space-5) 0 0; }
+  .app > .top h1 { font: var(--type-h4); letter-spacing: var(--tracking-tight); white-space: normal; }
   .app { grid-template-columns: 1fr; padding: 0 var(--space-4) var(--space-8); gap: var(--space-5); }
   .viewer { position: static; }
   .viewport { height: 62vh; height: 62svh; min-height: 300px; }
