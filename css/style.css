@@ -1,5 +1,5 @@
-/* Windlight generator on MDS v3 (Mariana's Design System). The base below is the PBR Texture
-   Generator's stylesheet, so the two tools look and behave alike; Windlight generator's own pieces
+/* Windlight Generator on MDS v3 (Mariana's Design System). The base below is the PBR Texture
+   Generator's stylesheet, so the two tools look and behave alike; Windlight Generator's own pieces
    (colour swatches, Advanced groups, day cycle, timeline, dialogs) follow at the end.
    Light by default, dark from the OS or data-theme="dark"; violet only for the main action,
    selection and focus. */
@@ -357,6 +357,18 @@ input[type="range"]:focus-visible { border-radius: var(--radius-sm); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------- Narrow screens ---------- */
+/* Large screens: an app-like page. The title stays put and the preview column fills the
+   window height; only the settings column scrolls. (Narrow screens keep a normal page.) */
+@media (min-width: 961px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  .top { flex: none; width: 100%; }
+  .app { flex: 1; min-height: 0; width: 100%; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: var(--space-6); }
+  .viewer { position: static; min-height: 0; }
+  .viewport { flex: 1; height: auto; min-height: 240px; }
+  .panel { min-height: 0; overflow-y: auto; align-content: start; padding: 2px 6px 2px 2px; margin: -2px -6px -2px -2px; } /* room for focus rings and the scrollbar */
+}
+
 @media (max-width: 960px) {
   .top { padding: var(--space-5) var(--space-4) var(--space-4); }
   .top h1 { font: var(--type-h3); letter-spacing: var(--tracking-tight); }
@@ -365,7 +377,7 @@ input[type="range"]:focus-visible { border-radius: var(--radius-sm); }
   .viewport { height: 62vh; height: 62svh; min-height: 300px; }
 }
 
-/* ================= Windlight generator ================= */
+/* ================= Windlight Generator ================= */
 
 code, output, .mono { font-family: var(--font-mono); }
 [hidden] { display: none !important; } /* component display rules (.btn is inline-flex) would otherwise beat it */
