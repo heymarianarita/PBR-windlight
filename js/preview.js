@@ -6,16 +6,29 @@
 import { ATMOS_UNIFORMS, ATMOS_FUNCS, skyUniforms, skyIrradiance, makeCloudNoise } from './atmosphere.js';
 import { WATER_PARAMS, toStored } from './params.js';
 
-// Seabed / island shape, shared by the ground mesh (JS) and the water shader (GLSL).
+// Island and seabed, shared by the ground mesh (JS) and the water shader (GLSL): a low
+// hill with an uneven coastline (radius wobbles with the angle), a beach that runs into
+// the water about 13 m out (an island ~26 m across), and a seabed falling to about −14 m.
 const ISLAND = /* glsl */ `
 float terrainHeight(vec2 p) {
   float r = length(p);
-  return 1.2 - smoothstep(18.0, 44.0, r) * 7.2;
+  float a = atan(p.y, p.x);
+  float re = r * (1.0 + 0.10 * sin(3.0 * a + 1.3) + 0.05 * sin(5.0 * a + 0.4));
+  return 0.35 * (1.0 - smoothstep(0.0, 10.0, re))
+       + mix(0.9, -2.0, smoothstep(8.0, 22.0, re))
+       - 12.0 * smoothstep(22.0, 70.0, re);
 }`;
+const smoothstep = (e0, e1, x) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
 const terrainHeight = (x, z) => {
   const r = Math.hypot(x, z);
-  const t = Math.min(1, Math.max(0, (r - 18) / 26));
-  return 1.2 - t * t * (3 - 2 * t) * 7.2;
+  const a = Math.atan2(z, x);
+  const re = r * (1 + 0.10 * Math.sin(3 * a + 1.3) + 0.05 * Math.sin(5 * a + 0.4));
+  return 0.35 * (1 - smoothstep(0, 10, re))
+    + (0.9 + (-2 - 0.9) * smoothstep(8, 22, re))
+    - 12 * smoothstep(22, 70, re);
 };
 
 const SHADING = /* glsl */ `
@@ -139,11 +152,19 @@ varying vec3 vNormal;
 void main() {
   vec3 base = albedo;
   if (terrain) {
-    // Grass on top, sand toward the water, darker wet sand below it.
-    vec3 grass = vec3(0.07, 0.11, 0.04);
-    vec3 sand = vec3(0.36, 0.32, 0.24);
-    base = mix(sand, grass, smoothstep(0.6, 1.1, vWorld.y));
-    base *= mix(0.6, 1.0, smoothstep(-0.3, 0.1, vWorld.y));
+    // Grass on top, sand toward the water, darker wet sand below it. Texture comes from the
+    // noise texture at three scales: big patches of drier grass, clumps, and fine blades.
+    vec2 q = vWorld.xz;
+    float patches = texture2D(cloud_noise, q * 0.035).x;
+    float clumps = texture2D(cloud_noise, q * 0.31 + 0.37).x;
+    float blades = texture2D(cloud_noise, q * 2.3 + 0.71).x;
+    vec3 grass = mix(vec3(0.040, 0.068, 0.022), vec3(0.105, 0.145, 0.042), smoothstep(0.3, 0.7, clumps));
+    grass = mix(grass, vec3(0.15, 0.14, 0.065), smoothstep(0.55, 0.8, patches) * 0.6); // drier patches
+    grass *= 0.65 + 0.7 * blades;
+    vec3 sand = vec3(0.36, 0.32, 0.24) * (0.88 + 0.24 * blades);
+    float edge = 0.45 + (clumps - 0.5) * 0.35; // ragged edge where grass meets sand
+    base = mix(sand, grass, smoothstep(edge, edge + 0.2, vWorld.y));
+    base *= mix(0.55, 1.0, smoothstep(-0.2, 0.15, vWorld.y)); // wet sand at the waterline
   }
   gl_FragColor = vec4(shade(vWorld, normalize(vNormal), base, roughness, metallic), 1.0);
 }`;
@@ -183,8 +204,10 @@ void main() {
   vec2 s1 = slope(p.xz * 0.015 + wave1 * time * 0.004);
   vec2 s2 = slope(p.xz * 0.05 + wave2 * time * 0.006);
   vec2 s3 = slope(p.xz * 0.2 + (wave1 + wave2) * time * 0.01);
-  vec2 s = (s1 + s2 * 0.4 + s3 * 0.6) * 0.5 * 0.15; // the noise is low-contrast (0.4), so slopes are scaled up
-  vec3 n = normalize(vec3(-s.x * norm_scale.x, max(norm_scale.z, 0.05) * 0.5, -s.y * norm_scale.y));
+  // Normal scale X, Y and Z are the strengths of the three wave layers, as in Firestorm
+  // (waterF.glsl mixes wave1 + wave2 × 0.4 + wave3 × 0.6). 2 is the default.
+  vec2 s = (s1 * norm_scale.x + s2 * 0.4 * norm_scale.y + s3 * 0.6 * norm_scale.z) * 0.5 * 0.15; // same look as before at the default 2
+  vec3 n = normalize(vec3(-s.x, 1.0, -s.y));
   n = normalize(mix(n, vec3(0.0, 1.0, 0.0), smoothstep(80.0, 3000.0, dist)));
 
   vec3 l = normalize(lightnorm);
@@ -204,10 +227,13 @@ void main() {
   float depth = max(0.0, -terrainHeight(bed));
   float path = depth / max(v.y, 0.08);
   float D = pow(0.98, path * fog_density);
-  vec3 sand = vec3(0.30, 0.27, 0.20) * (sunlit * max(l.y, 0.0) * 0.8 + irradiance);
-  vec3 fog = srgb_to_linear(fog_color) * (sunlit * max(l.y, 0.0) * 0.5 + irradiance);
-  vec3 refracted = mix(fog, sand, D * step(0.001, depth));
-  if (depth <= 0.001) refracted = sand;
+  // Light reaching the seabed fades with depth too, and takes on the water's colour.
+  vec3 tint = srgb_to_linear(fog_color);
+  float down = pow(0.98, depth * fog_density * 4.0);
+  vec3 bedLight = (sunlit * max(l.y, 0.0) * 0.8 + irradiance) * mix(tint * 3.0, vec3(1.0), down);
+  vec3 sand = vec3(0.17, 0.15, 0.11) * bedLight; // wet sand
+  vec3 fog = tint * (sunlit * max(l.y, 0.0) * 0.5 + irradiance);
+  vec3 refracted = mix(fog, sand, D);
 
   vec3 h = normalize(l + v);
   float a = max(blur, 0.03);
@@ -252,7 +278,7 @@ export async function createPreview(container) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 40000);
-  camera.position.set(15, 3.4, 13);
+  camera.position.set(9, 2.8, 8); // on the beach, looking across the island
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 2, 0);
   controls.enableDamping = true;
@@ -323,7 +349,8 @@ export async function createPreview(container) {
     fragmentShader: SURFACE_FRAG,
   });
 
-  const groundGeo = new THREE.CircleGeometry(48, 160, 0, Math.PI * 2);
+  // A grid, so every point follows the terrain (a circle fan only has a centre and a rim).
+  const groundGeo = new THREE.PlaneGeometry(200, 200, 256, 256);
   groundGeo.rotateX(-Math.PI / 2);
   const gp = groundGeo.attributes.position;
   for (let i = 0; i < gp.count; i++) gp.setY(i, terrainHeight(gp.getX(i), gp.getZ(i)));
@@ -491,7 +518,7 @@ export async function createPreview(container) {
       const flat = new THREE.Vector3(l.x, 0, l.z).normalize();
       if (!Number.isFinite(flat.x)) return;
       const d = Math.max(8, camera.position.distanceTo(controls.target));
-      camera.position.copy(controls.target).addScaledVector(flat, -Math.min(d, 20)).setY(3.4);
+      camera.position.copy(controls.target).addScaledVector(flat, -Math.min(d, 12)).setY(2.8);
     },
     // Stand on the island and look up at the clouds; drag to look around from there.
     lookUp() {

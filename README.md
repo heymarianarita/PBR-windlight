@@ -23,7 +23,7 @@ means two steps: the tool picks legacy values that look right under PBR, then yo
 
 ```
 index.html
-css/style.css   app styles on MDS v3 tokens: a header and two panels, light and dark
+css/style.css   app styles on MDS v3: the PBR Texture Generator's layout and components, plus Sky Maker's own
 css/mds/        MDS v3 (Mariana's Design System) tokens: colours, type, spacing, effects, base
 js/
   theme.js       Light / Dark / System theme switch
@@ -42,7 +42,7 @@ js/
 phase1/          hand-written import test files and checklist
 ```
 
-A project is one look: a single fixed sky, or a day cycle where every key has its own sky, plus one water. Sky names come from the project name ("My Look", "My Look Sunset"). Slider values use the units the
+A project is one look: a single fixed sky, or a day cycle where every key has its own sky, plus one water. Sky names come from the project name ("New windlight", "New windlight Sunset"). Slider values use the units the
 Firestorm editor shows, and `params.js` converts them to what the file stores.
 
 ### Preview: what's a guess

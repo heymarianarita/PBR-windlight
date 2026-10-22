@@ -4,7 +4,7 @@
 
 import { SKY_PARAMS, SKY_GROUPS, WATER_PARAMS, WATER_GROUPS, defaults } from './params.js';
 import { skyXml, skyFromLegacy, waterFromLegacy, parseXml, legacyFileName, cleanName } from './legacy-xml.js';
-import { downloadBlob, downloadZip, bundleFiles } from './export.js';
+import { downloadBlob, downloadZip } from './export.js';
 import { skyAt, generateVariants, formatTime, parseTime } from './daycycle.js';
 import { SKY_SIMPLE, WATER_SIMPLE } from './simple.js';
 import { skyUniforms, horizonColor } from './atmosphere.js';
@@ -20,9 +20,10 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 // ---------- Project ----------
 // A project is one look, the way Firestorm sees it: either a single sky, or a day cycle
-// where every key has its own sky. Sky names come from the project name ("My Look",
-// or "My Look Sunset" for a key labelled Sunset), so there is no sky list to manage.
-const DEFAULT_NAME = 'My Look';
+// where every key has its own sky. Sky names come from the project name ("New windlight",
+// or "New windlight Sunset" for a key labelled Sunset), so there is no sky list to manage.
+const DEFAULT_NAME = 'New windlight';
+const OLD_DEFAULT_NAMES = ['My Look']; // earlier default: still counts as unnamed
 
 function freshProject() {
   const id = uid();
@@ -87,7 +88,8 @@ function cleanValues(params, raw) {
 function sanitize(raw) {
   const p = freshProject();
   if (!raw || typeof raw !== 'object') return p;
-  if (typeof raw.name === 'string') p.name = cleanName(raw.name, 'My Look');
+  if (typeof raw.name === 'string') p.name = cleanName(raw.name, DEFAULT_NAME);
+  if (OLD_DEFAULT_NAMES.includes(p.name)) p.name = DEFAULT_NAME;
   if (raw.version === 1 || (raw.sky && !raw.skies)) {
     p.skies[0].values = cleanValues(SKY_PARAMS, raw.sky);
     return normalize(p);
@@ -107,7 +109,7 @@ function sanitize(raw) {
       .filter((k) => k && Number.isFinite(k.time) && p.skies.some((s) => s.id === k.sky))
       .map((k) => ({ id: typeof k.id === 'string' ? k.id : uid(), time: clamp(k.time, 0, 0.9999), sky: k.sky }));
   }
-  // Older projects named skies freely ("My Look Sunset"): keep the part after the project name as the label.
+  // Older projects named skies freely ("New windlight Sunset"): keep the part after the project name as the label.
   for (const s of p.skies) {
     if (!s.label && p.day.some((k) => k.sky === s.id)) {
       s.label = cleanLabel(s.name.startsWith(`${p.name} `) ? s.name.slice(p.name.length + 1) : s.name.split(' ').pop());
@@ -183,15 +185,21 @@ function buildRange(p, target, key) {
   else Object.assign(range, { min: p.min, max: p.max, step: p.step });
 
   // The control being dragged or typed in keeps its own value; everything else follows.
+  const fill = () => {
+    const lo = parseFloat(range.min), hi = parseFloat(range.max);
+    range.style.setProperty('--fill', `${((parseFloat(range.value) - lo) / (hi - lo)) * 100}%`);
+  };
   const show = () => {
     const v = readValue(p, target());
     if (document.activeElement !== range) range.value = toSlider(p, v);
+    fill();
     if (document.activeElement !== num) num.value = v.toFixed(decimals(p.step));
   };
   range.addEventListener('input', () => {
     const v = fromSlider(p, parseFloat(range.value));
     writeValue(p, target(), v);
     num.value = v.toFixed(decimals(p.step));
+    fill();
     changed({ controls: true });
   });
   num.addEventListener('input', () => {
@@ -251,7 +259,7 @@ function buildColor(p, target, key) {
 
 function appendHint(el, text) {
   const h = document.createElement('p');
-  h.className = 'hint';
+  h.className = 'about small';
   h.textContent = text;
   el.append(h);
 }
@@ -295,7 +303,7 @@ function renderSkyPicker() {
   const byId = Object.fromEntries(project.skies.map((s) => [s.id, s]));
   $('#sky-time-chips').replaceChildren(...project.day.map((k) => {
     const b = document.createElement('button');
-    b.className = 'chip';
+    b.type = 'button';
     b.setAttribute('aria-pressed', k.sky === project.active);
     b.innerHTML = '<span class="mono"></span> <span></span>';
     b.firstChild.textContent = formatTime(k.time);
@@ -333,7 +341,7 @@ function renderDay() {
     const sky = byId[k.sky];
     const row = document.createElement('li');
     row.className = 'day-key';
-    row.innerHTML = `<input type="text" class="time" maxlength="5" aria-label="Time"><input type="text" class="label" maxlength="24" aria-label="Name of this key"><button class="btn ghost sm">Edit</button><button class="icon-btn close" aria-label="Remove key">×</button>`;
+    row.innerHTML = `<input type="text" class="time" maxlength="5" aria-label="Time"><input type="text" class="label" maxlength="24" aria-label="Name of this key"><button type="button" class="btn secondary sm">Edit</button><button type="button" class="icon close" aria-label="Remove key">×</button>`;
     const [time, label] = row.querySelectorAll('input');
     time.value = formatTime(k.time);
     time.addEventListener('change', () => {
@@ -348,7 +356,7 @@ function renderDay() {
       changed({ day: true, controls: true });
     });
     row.querySelector('.btn').addEventListener('click', () => editKey(k));
-    const remove = row.querySelector('.icon-btn');
+    const remove = row.querySelector('.icon');
     remove.disabled = project.day.length < 2;
     remove.title = remove.disabled ? 'A day cycle needs at least one key. Use “Remove the day cycle” instead.' : 'Remove key';
     remove.addEventListener('click', () => {
@@ -432,7 +440,7 @@ function updatePreview() {
     ui.preview.setSky(sky);
     ui.preview.setWater(project.water);
     const info = ui.preview.info();
-    $('#exposure-badge').textContent = sky.probeAmbiance > 0 ? `Auto exposure ×${info.exposure.toFixed(2)}` : 'Auto exposure off';
+    $('#exposure-badge').textContent = sky.probeAmbiance > 0 ? `Exposure ×${info.exposure.toFixed(2)}` : 'Exposure off';
   }
   $('#ambiance-badge').textContent = `Ambiance ${sky.probeAmbiance.toFixed(2)}`;
 }
@@ -466,21 +474,15 @@ function refreshControls() {
   renderSkyPicker();
 }
 
-// Panel titles: the project name on the editor, the sky, water or time on the preview.
+// Preview title: the sky, the water, or the day cycle time being shown.
 function updateToolbar() {
   const sky = activeSky();
-  const keys = project.day.length;
-  $('#project-title').textContent = project.name;
-  $('#project-meta').textContent = keys ? `day cycle · ${keys} ${keys === 1 ? 'key' : 'keys'}` : 'one sky';
   if (ui.tab === 'water') {
     $('#preview-title').textContent = 'Water';
-    $('#file-name').textContent = 'water/Default.xml';
   } else if (ui.tab === 'day' && project.day.length) {
     $('#preview-title').textContent = `Day cycle · ${formatTime(ui.dayTime)}`;
-    $('#file-name').textContent = `days/${legacyFileName(project.name)}`;
   } else {
     $('#preview-title').textContent = sky.name;
-    $('#file-name').textContent = `skies/${legacyFileName(sky.name)}`;
   }
 }
 
@@ -659,20 +661,6 @@ async function openFiles(files) {
   }
 }
 
-function showFiles() {
-  const files = bundleFiles(project);
-  const sel = $('#files-select');
-  const dec = new TextDecoder();
-  const names = Object.keys(files);
-  const want = ui.tab === 'water' ? 'water/Default.xml' : ui.tab === 'day' ? names.find((n) => n.startsWith('days/')) : `skies/${legacyFileName(activeSky().name)}`;
-  sel.replaceChildren(...names.map((n) => new Option(n, n, false, n === want)));
-  const show = () => { $('#files-content').textContent = dec.decode(files[sel.value]); };
-  sel.onchange = show;
-  show();
-  $('#files-meta').textContent = `${names.length} files`;
-  $('#files').showModal();
-}
-
 // ---------- How to import ----------
 // Steps for this project as it is now: one sky, or a day cycle with one ambiance per key.
 const escHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -705,7 +693,6 @@ function showImportHelp() {
     <li>Open it, click <strong>Import</strong> and pick ${file('water', project.name)}.</li>
     ${apply}</ol>`;
   $('#import-steps').innerHTML = html;
-  $('#import-meta').textContent = project.day.length ? `day cycle · ${project.day.length} keys` : 'one sky';
   $('#import-dialog').showModal();
 }
 
@@ -814,23 +801,6 @@ $('#timeline-track').addEventListener('keydown', (e) => {
 });
 $('#play').addEventListener('click', () => setPlaying(!ui.playing));
 
-$('#photo-input').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) analyzeFile(f);
-  e.target.value = '';
-});
-const dz = $('#photo-drop');
-dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  dz.classList.remove('over');
-  const f = e.dataTransfer.files[0];
-  if (f) analyzeFile(f);
-});
-dz.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#photo-input').click(); } });
-dz.addEventListener('click', () => $('#photo-input').click());
 $('#photo-undo').addEventListener('click', () => {
   if (!photoUndo) return;
   Object.assign(project, photoUndo);
@@ -840,30 +810,64 @@ $('#photo-undo').addEventListener('click', () => {
   changed({ controls: true, day: true });
 });
 
-// "Generate from an image" works on the whole look, so it's an action, not an editor tab.
-function openImageDialog() {
-  $('#photo-actions').hidden = !photoUndo;
-  $('#image-dialog').showModal();
+// "Generate from an image" works on the whole look, so it's an action, not an editor tab:
+// a drop area in the panel (like the PBR texture generator), with the result in a dialog.
+let lastImage = null;
+function generateFrom(file) {
+  lastImage = file;
+  if (!$('#image-dialog').open) $('#image-dialog').showModal();
+  $('#photo-thumb').hidden = true;
+  $('#photo-notes').replaceChildren();
+  $('#photo-actions').hidden = true;
+  analyzeFile(file);
 }
-$('#open-image').addEventListener('click', openImageDialog);
+const imageDrop = $('#image-drop');
+imageDrop.addEventListener('click', () => $('#photo-input').click());
+imageDrop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#photo-input').click(); } });
+$('#photo-input').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) generateFrom(f);
+  e.target.value = '';
+});
+// Reading the same image another way replaces the result instead of stacking on it.
+$('#photo-kind').addEventListener('change', () => {
+  if (!lastImage) return;
+  if (photoUndo) Object.assign(project, photoUndo);
+  photoUndo = null;
+  generateFrom(lastImage);
+});
 $('#photo-done').addEventListener('click', () => $('#image-dialog').close());
-// Dropping an image anywhere on the page opens the dialog with it.
+
+// Drop an image anywhere on the page, or paste one.
 const isImage = (f) => f && (/^image\//.test(f.type) || /\.(exr|hdr)$/i.test(f.name));
+let dragDepth = 0;
+document.addEventListener('dragenter', (e) => {
+  if (![...e.dataTransfer.items].some((i) => i.kind === 'file')) return;
+  dragDepth++;
+  document.body.classList.add('dragging');
+});
+document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
 document.addEventListener('dragover', (e) => { if ([...e.dataTransfer.items].some((i) => i.kind === 'file')) e.preventDefault(); });
 document.addEventListener('drop', (e) => {
+  dragDepth = 0;
+  document.body.classList.remove('dragging');
   const f = e.dataTransfer.files[0];
   if (!isImage(f)) return;
   e.preventDefault();
-  if (!$('#image-dialog').open) openImageDialog();
-  analyzeFile(f);
+  generateFrom(f);
+});
+window.addEventListener('paste', (e) => {
+  if (e.target.closest?.('input, textarea')) return;
+  const f = [...(e.clipboardData?.files ?? [])].find(isImage);
+  if (!f) return;
+  e.preventDefault();
+  generateFrom(f);
 });
 
 $('#download-sky').addEventListener('click', downloadSky);
 $('#download-all').addEventListener('click', downloadAll);
 $('#how-to-import').addEventListener('click', showImportHelp);
-$('#how-to-import-menu').addEventListener('click', showImportHelp);
 $('#save-json').addEventListener('click', saveJson);
-$('#view-files').addEventListener('click', showFiles);
 $('#face-sun').addEventListener('click', () => ui.preview?.faceLight());
 $('#look-up').addEventListener('click', () => ui.preview?.lookUp());
 $('#zoom').addEventListener('click', (e) => {
@@ -872,13 +876,23 @@ $('#zoom').addEventListener('click', (e) => {
   e.currentTarget.title = on ? 'Restore' : 'Zoom';
 });
 $('#animate').addEventListener('change', (e) => ui.preview?.setAnimate(e.target.checked));
+$('#open-btn').addEventListener('click', () => $('#open-input').click());
+// Clicking the dimmed area outside a dialog closes it. Clicks on the backdrop land on
+// the <dialog> itself, outside its box.
+for (const dlg of document.querySelectorAll('dialog')) {
+  dlg.addEventListener('click', (e) => {
+    if (e.target !== dlg) return;
+    const r = dlg.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close();
+  });
+}
 $('#open-input').addEventListener('change', (e) => {
   const files = [...e.target.files];
   if (files.length) openFiles(files);
   e.target.value = '';
 });
 $('#reset').addEventListener('click', () => {
-  if (!confirm('Start a new project? Unsaved skies, water and day cycle are lost.')) return;
+  if (!confirm('Start over? Your sky, water and day cycle go back to the defaults. Save the project first if you want to keep it.')) return;
   project = freshProject();
   changed({ controls: true, day: true });
 });
